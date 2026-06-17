@@ -3,729 +3,725 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claude Code Stats</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<title>cc-lens Agent Wrapped</title>
 <style>
   :root {
-    --bg:       #f8eed2;
-    --surface:  #ffffff;
-    --ink:      #3b110c;
-    --ink-soft: #5d3d3a;
-    --font:     'Space Grotesk', sans-serif;
-    --shadow:   4px 4px 0px var(--ink);
-    --shadow-l: 6px 6px 0px var(--ink);
-    --line:     #d4c8a8;
-    /* accents */
-    --hay:      #e9e4a6;
-    --lavender: #bdb7fc;
-    --red:      #da1c1c;
-    --orange:   #dd5013;
-    --coffee:   #a05f1a;
+    --paper: #f6f1e4;
+    --paper-2: #fffaf0;
+    --ink: #16130f;
+    --muted: #6e675e;
+    --line: #242019;
+    --green: #b7ff4a;
+    --red: #ff4f3e;
+    --cyan: #61d6ff;
+    --amber: #ffc247;
+    --violet: #a58bff;
+    --shadow: 5px 5px 0 var(--line);
+    --mono: "SFMono-Regular", "Cascadia Mono", "Liberation Mono", ui-monospace, monospace;
+    --serif: Georgia, "Times New Roman", serif;
   }
 
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: 0s !important;
-      transition-duration: 0s !important;
-    }
-  }
+  * { box-sizing: border-box; }
 
   html, body {
-    height: 100%;
-    overflow: hidden;
-    font-family: var(--font);
-    background: var(--bg);
+    min-height: 100%;
+    margin: 0;
+    background:
+      linear-gradient(90deg, rgba(22,19,15,0.05) 1px, transparent 1px),
+      linear-gradient(rgba(22,19,15,0.05) 1px, transparent 1px),
+      var(--paper);
+    background-size: 34px 34px;
     color: var(--ink);
-    background-image: radial-gradient(circle, rgba(59,17,12,0.06) 1px, transparent 1px);
-    background-size: 26px 26px;
+    font-family: var(--mono);
   }
 
-  .shell {
+  button {
+    min-height: 44px;
+    border: 2px solid var(--line);
+    background: var(--paper-2);
+    color: var(--ink);
+    font: 700 0.78rem var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 14px;
+    box-shadow: 3px 3px 0 var(--line);
+    cursor: pointer;
+  }
+
+  button:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--line); }
+  button:active { transform: translate(2px, 2px); box-shadow: none; }
+
+  .page {
+    width: min(1260px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 24px 0 44px;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border: 2px solid var(--line);
+    background: var(--green);
+    box-shadow: 3px 3px 0 var(--line);
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    gap: 18px;
+    align-items: stretch;
+    margin-bottom: 18px;
+  }
+
+  .headline {
+    border: 3px solid var(--line);
+    background: var(--paper-2);
+    box-shadow: var(--shadow);
+    padding: clamp(20px, 3vw, 34px);
+    min-height: 268px;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 2px solid var(--line);
+    background: var(--cyan);
+    padding: 7px 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    margin-bottom: 18px;
+  }
+
+  h1 {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: clamp(3.2rem, 8vw, 7.8rem);
+    line-height: 0.82;
+    letter-spacing: 0;
+  }
+
+  .hero-copy {
+    max-width: 720px;
+    margin: 18px 0 0;
+    color: var(--muted);
+    font-size: 0.94rem;
+    line-height: 1.55;
+  }
+
+  .scoreboard {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .metric {
+    border: 3px solid var(--line);
+    background: var(--paper-2);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    min-height: 128px;
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
+    justify-content: space-between;
   }
 
-  /* ── TOP BAR ── */
-  .topbar {
+  .metric:nth-child(1) { background: var(--green); }
+  .metric:nth-child(2) { background: var(--amber); }
+  .metric:nth-child(3) { background: var(--cyan); }
+  .metric:nth-child(4) { background: var(--violet); }
+
+  .metric-value {
+    display: block;
+    font-family: var(--serif);
+    font-size: clamp(2.2rem, 5vw, 4.2rem);
+    line-height: 0.9;
+    font-weight: 900;
+  }
+
+  .metric-label {
+    display: block;
+    margin-top: 10px;
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .band {
+    border-top: 3px solid var(--line);
+    padding-top: 18px;
+    margin-top: 24px;
+  }
+
+  .section-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.65rem 1.3rem;
-    border-bottom: 3px solid var(--ink);
-    flex-shrink: 0;
-    background: var(--bg);
+    gap: 16px;
+    margin-bottom: 12px;
   }
 
-  .topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-  }
-
-  .topbar-star {
-    color: var(--red);
-    font-size: 1.2rem;
-    animation: spin 12s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .topbar-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--ink);
-  }
-
-  /* top-right stats — LARGE prominent badges */
-  .topbar-stats {
-    display: flex;
-    gap: 0.7rem;
-  }
-
-  .topbar-stat {
-    background: var(--surface);
-    border: 3px solid var(--ink);
-    box-shadow: 3px 3px 0px var(--ink);
-    padding: 0.5rem 1.1rem;
-    display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    transition: transform 100ms ease-out, box-shadow 100ms ease-out;
-  }
-
-  .topbar-stat:nth-child(1) { border-top: 5px solid var(--red); }
-  .topbar-stat:nth-child(2) { border-top: 5px solid var(--orange); }
-  .topbar-stat:nth-child(3) { border-top: 5px solid var(--coffee); }
-
-  .topbar-stat:hover { transform: translateY(-2px); box-shadow: 4px 4px 0px var(--ink); }
-  .topbar-stat:active { transform: translate(2px, 2px); box-shadow: none; }
-
-  .topbar-stat-num {
-    font-size: 1.7rem;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--ink);
-  }
-
-  .topbar-stat-lbl {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ink-soft);
-  }
-
-  /* ── GRID AREA ── */
-  .grid-area {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 1rem 1.2rem;
-  }
-
-  .grid-area::-webkit-scrollbar { width: 5px; }
-  .grid-area::-webkit-scrollbar-track { background: transparent; }
-  .grid-area::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
-  .grid-area { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.1rem;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  /* ── CARD ── */
-  .card {
-    background: var(--surface);
-    border: 3px solid var(--ink);
-    box-shadow: var(--shadow);
-    position: relative;
-    overflow: visible;
-    transition: transform 150ms ease-out, box-shadow 150ms ease-out;
-    opacity: 0;
-    transform: translateY(12px);
-  }
-
-  .card.visible { opacity: 1; transform: translateY(0); }
-  .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-l); z-index: 5; }
-  .card:active { transform: translate(2px, 2px); box-shadow: none; }
-
-  /* rank badge */
-  .card-rank {
-    position: absolute;
-    top: -11px;
-    right: 12px;
-    background: var(--ink);
-    color: var(--bg);
-    font-size: 0.6rem;
-    font-weight: 700;
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    z-index: 2;
-  }
-
-  /* header strip — cycles through 5 accents */
-  .card-head {
-    padding: 0.6rem 0.9rem;
-    border-bottom: 3px solid var(--ink);
-  }
-
-  .card:nth-child(5n+1) .card-head { background: var(--hay); }
-  .card:nth-child(5n+2) .card-head { background: var(--lavender); }
-  .card:nth-child(5n+3) .card-head { background: var(--red); }
-  .card:nth-child(5n+4) .card-head { background: var(--orange); }
-  .card:nth-child(5n+5) .card-head { background: var(--coffee); }
-
-  /* red/orange/coffee headers need light text */
-  .card:nth-child(5n+3) .card-name,
-  .card:nth-child(5n+4) .card-name,
-  .card:nth-child(5n+5) .card-name { color: #fff; }
-
-  .card-name {
-    font-size: 1.05rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--ink);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .card-name .char {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  /* body */
-  .card-body {
-    padding: 0.8rem 0.9rem 0.7rem;
-  }
-
-  /* big prompt number */
-  .card-num {
-    font-size: 2.6rem;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--ink);
-    margin-bottom: 0.5rem;
-  }
-
-  /* stats line */
-  .card-stats-line {
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--ink-soft);
-    margin-bottom: 0.45rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .card-stats-line b {
-    font-weight: 700;
-    color: var(--ink);
-  }
-
-  .card-stats-line .sep {
-    opacity: 0.3;
-    margin: 0 0.25rem;
-  }
-
-  .card-stats-line .oneshot {
-    font-weight: 700;
-    color: var(--orange);
-    font-style: italic;
-  }
-
-  /* dates */
-  .card-dates {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--ink-soft);
-    opacity: 0.55;
-    margin-bottom: 0.55rem;
-  }
-
-  /* intensity section */
-  .intensity-lbl {
-    font-size: 0.5rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--ink-soft);
-    margin-bottom: 0.2rem;
-  }
-
-  .intensity-track {
-    height: 12px;
-    background: var(--bg);
-    border: 2px solid var(--ink);
-    overflow: hidden;
-  }
-
-  .intensity-fill {
-    height: 100%;
-    width: 0%;
-    transition: width 700ms ease-out;
-    background-color: var(--bar-color, var(--ink));
-    background-image: repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 3px,
-      rgba(59,17,12,0.12) 3px,
-      rgba(59,17,12,0.12) 6px
-    );
-  }
-
-  /* ── BOTTOM BAR ── */
-  .bottombar {
-    border-top: 2px solid var(--line);
-    padding: 0.45rem;
-    text-align: center;
-    flex-shrink: 0;
-  }
-
-  .bottombar p {
-    font-size: 0.5rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--ink-soft);
-    opacity: 0.35;
-  }
-
-  .loading {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 3rem;
-    font-size: 0.85rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--ink-soft);
-    opacity: 0.5;
-  }
-
-  /* ── TIMELINE SECTION ── */
-  .timeline-section {
-    max-width: 1200px;
-    margin: 1.5rem auto 0;
-  }
-
-  .tl-header {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 1rem;
-  }
-
-  .tl-header h2 {
-    font-size: 1rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .tl-header .tl-line {
-    flex: 1;
-    height: 3px;
-    background: var(--ink);
-  }
-
-  /* summary badges row */
-  .tl-summary {
-    display: flex;
-    gap: 0.8rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.2rem;
-  }
-
-  .tl-badge {
-    background: var(--surface);
-    border: 3px solid var(--ink);
-    box-shadow: 3px 3px 0px var(--ink);
-    padding: 0.6rem 1rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 120px;
-    transition: transform 100ms ease-out, box-shadow 100ms ease-out;
-  }
-
-  .tl-badge:hover { transform: translateY(-2px); box-shadow: 4px 4px 0px var(--ink); }
-
-  .tl-badge-num {
-    font-size: 1.6rem;
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .tl-badge-lbl {
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-soft);
-    margin-top: 0.2rem;
-  }
-
-  /* weekly chart */
-  .tl-chart-title {
-    font-size: 0.65rem;
-    font-weight: 700;
+  .section-head h2 {
+    margin: 0;
+    font-size: 0.92rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: var(--ink-soft);
-    margin-bottom: 0.5rem;
   }
 
-  .tl-weeks {
-    display: flex;
-    align-items: flex-end;
-    gap: 3px;
-    height: 120px;
-    background: var(--surface);
-    border: 3px solid var(--ink);
+  .stamp {
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+
+  .source-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .source {
+    border: 2px solid var(--line);
+    background: var(--paper-2);
+    padding: 12px;
+    min-height: 112px;
+    position: relative;
+  }
+
+  .source::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 8px;
+    background: var(--muted);
+    border-bottom: 2px solid var(--line);
+  }
+
+  .source.loaded::before { background: var(--green); }
+  .source.detected::before { background: var(--amber); }
+  .source.error::before { background: var(--red); }
+
+  .source-name {
+    margin-top: 12px;
+    font-weight: 900;
+    font-size: 0.88rem;
+  }
+
+  .source-state {
+    margin-top: 8px;
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+
+  .wrapped-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .wrapped-card,
+  .project-row,
+  .agent-row,
+  .timeline-panel,
+  .empty {
+    border: 3px solid var(--line);
+    background: var(--paper-2);
     box-shadow: var(--shadow);
-    padding: 0.6rem 0.6rem 0.4rem;
-    margin-bottom: 1.2rem;
+  }
+
+  .wrapped-card {
+    min-height: 180px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .wrapped-card:nth-child(4n+1) { background: var(--green); }
+  .wrapped-card:nth-child(4n+2) { background: var(--cyan); }
+  .wrapped-card:nth-child(4n+3) { background: var(--amber); }
+  .wrapped-card:nth-child(4n+4) { background: var(--violet); }
+
+  .wrapped-title {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 900;
+  }
+
+  .wrapped-value {
+    margin: 16px 0;
+    font-family: var(--serif);
+    font-size: clamp(1.8rem, 3.4vw, 3.2rem);
+    line-height: 0.92;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+  }
+
+  .wrapped-detail {
+    color: rgba(22,19,15,0.72);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    gap: 14px;
+  }
+
+  .agent-list,
+  .project-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .agent-row,
+  .project-row {
+    padding: 14px;
+  }
+
+  .row-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .row-name {
+    font-weight: 900;
+    overflow-wrap: anywhere;
+  }
+
+  .row-meta {
+    color: var(--muted);
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  .bar {
+    height: 18px;
+    border: 2px solid var(--line);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--green);
+    border-right: 2px solid var(--line);
+    transition: width 650ms ease;
+  }
+
+  .project-row:nth-child(3n+1) .bar-fill { background: var(--red); }
+  .project-row:nth-child(3n+2) .bar-fill { background: var(--cyan); }
+  .project-row:nth-child(3n+3) .bar-fill { background: var(--amber); }
+
+  .timeline-panel {
+    padding: 16px;
     overflow-x: auto;
   }
 
-  .tl-week-col {
+  .weeks {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    height: 168px;
+    min-width: 680px;
+    padding-top: 20px;
+  }
+
+  .week {
     flex: 1;
-    min-width: 18px;
-    max-width: 40px;
+    min-width: 16px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    height: 100%;
     justify-content: flex-end;
-    position: relative;
-    cursor: default;
+    align-items: stretch;
+    gap: 5px;
   }
 
-  .tl-week-bar {
-    width: 100%;
-    min-height: 2px;
-    background: var(--lavender);
-    border: 2px solid var(--ink);
-    transition: height 600ms ease-out;
-    background-image: repeating-linear-gradient(
-      -45deg,
-      transparent, transparent 2px,
-      rgba(59,17,12,0.1) 2px, rgba(59,17,12,0.1) 4px
-    );
+  .week-bar {
+    min-height: 3px;
+    border: 2px solid var(--line);
+    background: var(--red);
+    transition: height 650ms ease;
   }
 
-  .tl-week-col:hover .tl-week-bar { background-color: var(--orange); }
+  .week:nth-child(4n+2) .week-bar { background: var(--green); }
+  .week:nth-child(4n+3) .week-bar { background: var(--cyan); }
+  .week:nth-child(4n+4) .week-bar { background: var(--amber); }
 
-  .tl-week-lbl {
-    font-size: 0.45rem;
-    font-weight: 700;
-    color: var(--ink-soft);
-    margin-top: 0.2rem;
-    white-space: nowrap;
-    text-transform: uppercase;
+  .week-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 0.58rem;
+    color: var(--muted);
+    height: 44px;
+    overflow: hidden;
   }
 
-  /* tooltip */
-  .tl-week-col .tl-tip {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--ink);
-    color: var(--bg);
-    padding: 0.35rem 0.5rem;
-    font-size: 0.6rem;
-    font-weight: 700;
-    white-space: nowrap;
-    z-index: 10;
-    pointer-events: none;
+  .empty {
+    padding: 22px;
+    color: var(--muted);
+    line-height: 1.55;
   }
 
-  .tl-week-col:hover .tl-tip { display: block; }
+  .hidden { display: none !important; }
 
-  /* monthly table */
-  .tl-months {
-    background: var(--surface);
-    border: 3px solid var(--ink);
-    box-shadow: var(--shadow);
-    margin-bottom: 1.5rem;
+  @media (max-width: 980px) {
+    .hero,
+    .split {
+      grid-template-columns: 1fr;
+    }
+
+    .source-grid,
+    .wrapped-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
-  .tl-month-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    padding: 0.5rem 0.8rem;
-    border-bottom: 2px solid var(--line);
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--ink-soft);
-  }
-
-  .tl-month-row:last-child { border-bottom: none; }
-
-  .tl-month-row.tl-month-head {
-    background: var(--hay);
-    border-bottom: 3px solid var(--ink);
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink);
-  }
-
-  .tl-month-row b { color: var(--ink); }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 900px) {
-    .cards { grid-template-columns: repeat(2, 1fr); }
-    .topbar-stat { padding: 0.4rem 0.7rem; }
-    .topbar-stat-num { font-size: 1.3rem; }
-  }
-  @media (max-width: 600px) {
-    .topbar { flex-wrap: wrap; gap: 0.5rem; }
-    .topbar-stats { width: 100%; justify-content: center; }
-    .cards { grid-template-columns: 1fr; }
+  @media (max-width: 620px) {
+    .page { width: min(100% - 20px, 1260px); padding-top: 12px; }
+    .topbar { align-items: flex-start; flex-direction: column; }
+    .actions { justify-content: flex-start; }
+    .scoreboard,
+    .source-grid,
+    .wrapped-grid {
+      grid-template-columns: 1fr;
+    }
+    .headline { min-height: 0; }
   }
 </style>
 </head>
 <body>
-
-<div class="shell">
-  <div class="topbar">
-    <div class="topbar-left">
-      <span class="topbar-star" aria-hidden="true">★</span>
-      <span class="topbar-title">Claude Code Stats</span>
+<main class="page">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">CC</span>
+      <span>cc-lens</span>
     </div>
-    <div class="topbar-stats" id="topbar-stats"></div>
-  </div>
-
-  <div class="grid-area">
-    <div class="cards" id="cards">
-      <div class="loading">Loading...</div>
+    <div class="actions">
+      <button id="privacy-btn" type="button">Privacy on</button>
+      <button id="sample-btn" type="button">Sample</button>
+      <button id="export-btn" type="button">Export SVG</button>
     </div>
-    <div class="timeline-section" id="timeline" style="display:none"></div>
-  </div>
+  </header>
 
-  <div class="bottombar"><p>Built with Go + Vanilla JS</p></div>
-</div>
+  <section class="hero">
+    <div class="headline">
+      <div class="eyebrow">Local-first AI Coding Wrapped</div>
+      <h1>Agent<br>Wrapped</h1>
+      <p class="hero-copy" id="hero-copy">Reading local agent history. Raw prompts stay local and are never rendered.</p>
+    </div>
+    <div class="scoreboard" id="scoreboard"></div>
+  </section>
+
+  <section class="band">
+    <div class="section-head">
+      <h2>Source health</h2>
+      <span class="stamp" id="generated-at"></span>
+    </div>
+    <div class="source-grid" id="sources"></div>
+  </section>
+
+  <section class="band">
+    <div class="section-head">
+      <h2>Wrapped cards</h2>
+      <span class="stamp">estimated from local history files</span>
+    </div>
+    <div class="wrapped-grid" id="highlights"></div>
+  </section>
+
+  <section class="band split">
+    <div>
+      <div class="section-head">
+        <h2>Agent mix</h2>
+      </div>
+      <div class="agent-list" id="agents"></div>
+    </div>
+    <div>
+      <div class="section-head">
+        <h2>Top projects</h2>
+      </div>
+      <div class="project-list" id="projects"></div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="section-head">
+      <h2>Weekly activity</h2>
+      <span class="stamp" id="timeline-stamp"></span>
+    </div>
+    <div class="timeline-panel">
+      <div class="weeks" id="weeks"></div>
+    </div>
+  </section>
+</main>
 
 <script>
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
+let wrapped = null;
+let privacy = true;
 
-function countUp(el, target, duration = 1000) {
-  const start = performance.now();
-  function tick(now) {
-    const t = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - t, 3);
-    el.textContent = Math.round(eased * target);
-    if (t < 1) requestAnimationFrame(tick);
-    else el.textContent = target;
+const sampleWrapped = {
+  generated_at: new Date().toISOString(),
+  sources: [
+    { id: 'claude', name: 'Claude Code', state: 'loaded', records: 184, confidence: 'estimated', message: 'Claude prompts loaded.' },
+    { id: 'codex', name: 'Codex CLI', state: 'loaded', records: 76, confidence: 'estimated', message: 'Codex prompts loaded.' },
+    { id: 'gemini', name: 'Gemini / Antigravity', state: 'loaded', records: 31, confidence: 'estimated', message: 'Gemini prompts loaded.' },
+    { id: 'opencode', name: 'OpenCode', state: 'detected', records: 0, confidence: 'detected', message: 'OpenCode SQLite history detected.' },
+    { id: 'cursor', name: 'Cursor', state: 'detected', records: 0, confidence: 'detected', message: 'Cursor storage detected.' }
+  ],
+  totals: { prompts: 291, sessions: 42, projects: 9, sources: 3, active_days: 24, estimated_tokens: 118400 },
+  highlights: [
+    { title: 'Top project', value: 'letterboxd_wrapped', detail: '91 prompts via Claude Code' },
+    { title: 'Main agent', value: 'Claude Code', detail: '184 prompts captured locally' },
+    { title: 'Busiest week', value: 'Jun 08 - Jun 14', detail: '82 prompts across 11 sessions' },
+    { title: 'Longest streak', value: '8 days', detail: 'Consecutive days with AI coding activity' },
+    { title: 'Peak hour', value: '21:00', detail: '39 prompts started in this hour' },
+    { title: 'Weekend mode', value: '53 prompts', detail: '18% of all captured activity' }
+  ],
+  source_breakdown: [
+    { id: 'claude', name: 'Claude Code', prompts: 184, sessions: 27, tokens: 82100 },
+    { id: 'codex', name: 'Codex CLI', prompts: 76, sessions: 9, tokens: 21400 },
+    { id: 'gemini', name: 'Gemini / Antigravity', prompts: 31, sessions: 6, tokens: 14900 }
+  ],
+  projects: [
+    { name: 'letterboxd_wrapped', source: 'Claude Code', prompts: 91, sessions: 12, active_days: 8, tokens: 40400 },
+    { name: 'job_search', source: 'Claude Code', prompts: 43, sessions: 6, active_days: 5, tokens: 18200 },
+    { name: 'Codex CLI', source: 'Codex CLI', prompts: 76, sessions: 9, active_days: 11, tokens: 21400 },
+    { name: 'cc_lens', source: 'Gemini / Antigravity', prompts: 31, sessions: 6, active_days: 4, tokens: 14900 }
+  ],
+  timeline: {
+    active_weeks: 8,
+    total_weeks: 10,
+    weeks: Array.from({ length: 10 }).map((_, i) => ({
+      week: '2026-W' + String(i + 14).padStart(2, '0'),
+      label: 'W' + (i + 14),
+      prompts: [12, 18, 9, 33, 21, 45, 28, 82, 31, 12][i],
+      sessions: [2, 3, 2, 6, 4, 7, 5, 11, 4, 2][i],
+      tokens: 1000
+    }))
   }
-  requestAnimationFrame(tick);
+};
+
+function esc(value) {
+  const div = document.createElement('div');
+  div.textContent = String(value ?? '');
+  return div.innerHTML;
 }
 
-function makeCharSpans(text) {
-  return [...text].map(c =>
-    c === ' '
-      ? '<span class="char" style="opacity:1;transform:none">&nbsp;</span>'
-      : `<span class="char">${esc(c)}</span>`
-  ).join('');
+function fmt(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n ?? 0);
 }
 
-function typeReveal(container) {
-  const chars = container.querySelectorAll('.char');
-  chars.forEach((ch, i) => {
-    setTimeout(() => {
-      ch.style.transition = 'opacity 60ms ease-out, transform 60ms ease-out';
-      ch.style.opacity = '1';
-      ch.style.transform = 'translateY(0)';
-    }, i * 20);
-  });
+function displayProject(name, index) {
+  return privacy ? `Project ${String.fromCharCode(65 + (index % 26))}` : name;
 }
 
-function renderTopStats(totalPrompts, totalSessions, projectCount) {
-  const el = document.getElementById('topbar-stats');
+function displayHighlight(h, index) {
+  if (!privacy || !/project/i.test(h.title)) return h.value;
+  return displayProject(h.value, index);
+}
+
+function render(data) {
+  wrapped = data;
+  const totals = data.totals || {};
+  document.getElementById('generated-at').textContent = data.generated_at ? new Date(data.generated_at).toLocaleString() : '';
+  document.getElementById('hero-copy').textContent =
+    totals.prompts > 0
+      ? `${fmt(totals.prompts)} prompts across ${fmt(totals.sources)} loaded sources. Raw prompts stay local and are never rendered.`
+      : 'No parseable local history yet. Use Sample to preview the wrapped layout.';
+
+  renderScoreboard(totals);
+  renderSources(data.sources || []);
+  renderHighlights(data.highlights || []);
+  renderAgents(data.source_breakdown || []);
+  renderProjects(data.projects || []);
+  renderTimeline((data.timeline || {}).weeks || []);
+}
+
+function renderScoreboard(totals) {
   const items = [
-    { value: totalPrompts, label: 'Prompts' },
-    { value: totalSessions, label: 'Sessions' },
-    { value: projectCount, label: 'Projects' }
+    ['Prompts', totals.prompts],
+    ['Sessions', totals.sessions],
+    ['Projects', totals.projects],
+    ['Est. tokens', totals.estimated_tokens]
   ];
-
-  el.innerHTML = items.map(s => `
-    <div class="topbar-stat">
-      <span class="topbar-stat-num" data-target="${s.value}">0</span>
-      <span class="topbar-stat-lbl">${s.label}</span>
+  document.getElementById('scoreboard').innerHTML = items.map(([label, value]) => `
+    <div class="metric">
+      <span class="metric-value">${fmt(value || 0)}</span>
+      <span class="metric-label">${esc(label)}</span>
     </div>
   `).join('');
-
-  setTimeout(() => {
-    el.querySelectorAll('.topbar-stat-num').forEach(n => {
-      countUp(n, parseInt(n.dataset.target), 800);
-    });
-  }, 150);
 }
 
-function renderCards(data) {
-  const maxIntensity = Math.max(...data.map(p => p.intensity), 1);
-  const cardsEl = document.getElementById('cards');
-  const accents = ['var(--hay)', 'var(--lavender)', 'var(--red)', 'var(--orange)', 'var(--coffee)'];
-
-  cardsEl.innerHTML = data.map((p, i) => {
-    const barPct = Math.min((p.intensity / maxIntensity) * 100, 100).toFixed(1);
-    const barColor = accents[i % 5];
-
-    /* conditional: 1 active day → "Tek Oturuşta" instead of X/day */
-    let intensityText;
-    if (p.active_days <= 1) {
-      intensityText = '<span class="oneshot">One Shot</span>';
-    } else {
-      intensityText = `<b>${p.intensity}</b> prompts/day`;
-    }
-
-    return `
-      <article class="card" data-index="${i}">
-        <div class="card-rank">${i + 1}</div>
-        <div class="card-head">
-          <div class="card-name">${makeCharSpans(p.name)}</div>
-        </div>
-        <div class="card-body">
-          <div class="card-num" data-count="${p.prompts}">0</div>
-          <div class="card-stats-line">
-            <b>${p.sessions}</b> sessions<span class="sep">&middot;</span><b>${p.active_days}</b> active days<span class="sep">&middot;</span>${intensityText}
-          </div>
-          <div class="card-dates">${p.first_date} &rarr; ${p.last_date}</div>
-          <div class="intensity-lbl">DAILY INTENSITY (prompts/day)</div>
-          <div class="intensity-track">
-            <div class="intensity-fill" data-width="${barPct}" style="--bar-color:${barColor}"></div>
-          </div>
-        </div>
-      </article>`;
-  }).join('');
-
-  cardsEl.querySelectorAll('.card').forEach((card, i) => {
-    setTimeout(() => {
-      card.style.transition = 'opacity 180ms ease-out, transform 180ms ease-out';
-      card.classList.add('visible');
-      typeReveal(card.querySelector('.card-name'));
-      countUp(card.querySelector('.card-num'), parseInt(card.querySelector('.card-num').dataset.count), 800);
-      const fill = card.querySelector('.intensity-fill');
-      setTimeout(() => { fill.style.width = fill.dataset.width + '%'; }, 120);
-    }, 60 + i * 70);
-  });
+function renderSources(sources) {
+  document.getElementById('sources').innerHTML = sources.map(source => `
+    <article class="source ${esc(source.state)}">
+      <div class="source-name">${esc(source.name)}</div>
+      <div class="source-state">${esc(source.state)} / ${fmt(source.records || 0)} records<br>${esc(source.message || '')}</div>
+    </article>
+  `).join('');
 }
 
-function fmtNum(n) {
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-  return String(n);
+function renderHighlights(highlights) {
+  const el = document.getElementById('highlights');
+  if (!highlights.length) {
+    el.innerHTML = '<div class="empty">No wrapped cards yet.</div>';
+    return;
+  }
+  el.innerHTML = highlights.map((h, i) => `
+    <article class="wrapped-card">
+      <div class="wrapped-title">${esc(h.title)}</div>
+      <div class="wrapped-value">${esc(displayHighlight(h, i))}</div>
+      <div class="wrapped-detail">${esc(h.detail)}</div>
+    </article>
+  `).join('');
 }
 
-function renderTimeline(tl) {
-  const el = document.getElementById('timeline');
-  el.style.display = '';
-
-  const maxPrompts = Math.max(...tl.weeks.map(w => w.prompts), 1);
-
-  let html = `
-    <div class="tl-header">
-      <h2>Activity Timeline</h2>
-      <div class="tl-line"></div>
-    </div>
-    <div class="tl-summary">
-      <div class="tl-badge" style="border-top: 5px solid var(--lavender)">
-        <span class="tl-badge-num">${fmtNum(tl.total_tokens)}</span>
-        <span class="tl-badge-lbl">Est. Tokens</span>
+function renderAgents(agents) {
+  const el = document.getElementById('agents');
+  if (!agents.length) {
+    el.innerHTML = '<div class="empty">No loaded agent history.</div>';
+    return;
+  }
+  const max = Math.max(...agents.map(a => a.prompts), 1);
+  el.innerHTML = agents.map(agent => `
+    <article class="agent-row">
+      <div class="row-top">
+        <span class="row-name">${esc(agent.name)}</span>
+        <span class="row-meta">${fmt(agent.prompts)} prompts</span>
       </div>
-      <div class="tl-badge" style="border-top: 5px solid var(--red)">
-        <span class="tl-badge-num">${tl.active_weeks}/${tl.total_weeks}</span>
-        <span class="tl-badge-lbl">Active Weeks</span>
-      </div>
-      <div class="tl-badge" style="border-top: 5px solid var(--orange)">
-        <span class="tl-badge-num">${tl.avg_prompts_per_week}</span>
-        <span class="tl-badge-lbl">Avg Prompts/Week</span>
-      </div>
-      <div class="tl-badge" style="border-top: 5px solid var(--coffee)">
-        <span class="tl-badge-num">${fmtNum(Math.round(tl.avg_tokens_per_week))}</span>
-        <span class="tl-badge-lbl">Avg Tokens/Week</span>
-      </div>
-    </div>
-
-    <div class="tl-chart-title">Weekly Activity</div>
-    <div class="tl-weeks">
-      ${tl.weeks.map(w => {
-        const pct = Math.max((w.prompts / maxPrompts) * 100, 3).toFixed(1);
-        const top3 = (w.top_projects || []).map(p => esc(p.name) + ': ' + p.prompts).join(', ');
-        return `
-          <div class="tl-week-col">
-            <div class="tl-tip">${esc(w.label)}<br>${w.prompts} prompt · ${w.sessions} session${top3 ? '<br>' + top3 : ''}</div>
-            <div class="tl-week-bar" data-height="${pct}" style="height: 0%"></div>
-            <div class="tl-week-lbl">${esc(w.week.split('-')[1] || w.week)}</div>
-          </div>`;
-      }).join('')}
-    </div>
-
-    <div class="tl-chart-title">Monthly Summary</div>
-    <div class="tl-months">
-      <div class="tl-month-row tl-month-head">
-        <span>Month</span><span>Prompts</span><span>Tokens</span><span>Active Days</span>
-      </div>
-      ${tl.months.map(m => `
-        <div class="tl-month-row">
-          <span><b>${esc(m.label)}</b></span>
-          <span><b>${m.prompts}</b></span>
-          <span>${fmtNum(m.tokens)}</span>
-          <span>${m.active_days} days</span>
-        </div>
-      `).join('')}
-    </div>
-  `;
-
-  el.innerHTML = html;
-
-  // animate bars
-  setTimeout(() => {
-    el.querySelectorAll('.tl-week-bar').forEach(bar => {
-      bar.style.height = bar.dataset.height + '%';
-    });
-  }, 100);
+      <div class="bar"><div class="bar-fill" style="width:${Math.max(4, agent.prompts / max * 100).toFixed(1)}%"></div></div>
+    </article>
+  `).join('');
 }
 
-fetch('/api/stats')
-  .then(r => r.json())
-  .then(data => {
-    const totalPrompts = data.reduce((s, p) => s + p.prompts, 0);
-    const totalSessions = data.reduce((s, p) => s + p.sessions, 0);
-    renderTopStats(totalPrompts, totalSessions, data.length);
-    renderCards(data);
-  });
+function renderProjects(projects) {
+  const el = document.getElementById('projects');
+  if (!projects.length) {
+    el.innerHTML = '<div class="empty">No loaded projects yet.</div>';
+    return;
+  }
+  const top = projects.slice(0, 8);
+  const max = Math.max(...top.map(p => p.prompts), 1);
+  el.innerHTML = top.map((project, index) => `
+    <article class="project-row">
+      <div class="row-top">
+        <span class="row-name">${esc(displayProject(project.name, index))}</span>
+        <span class="row-meta">${fmt(project.prompts)} / ${esc(project.source)}</span>
+      </div>
+      <div class="bar"><div class="bar-fill" style="width:${Math.max(4, project.prompts / max * 100).toFixed(1)}%"></div></div>
+    </article>
+  `).join('');
+}
 
-fetch('/api/timeline')
-  .then(r => r.json())
-  .then(renderTimeline);
+function renderTimeline(weeks) {
+  const el = document.getElementById('weeks');
+  document.getElementById('timeline-stamp').textContent = weeks.length ? `${weeks.length} active weeks` : '';
+  if (!weeks.length) {
+    el.innerHTML = '<div class="empty">No weekly activity yet.</div>';
+    return;
+  }
+  const max = Math.max(...weeks.map(w => w.prompts), 1);
+  el.innerHTML = weeks.map(week => `
+    <div class="week" title="${esc(week.label)} / ${fmt(week.prompts)} prompts">
+      <div class="week-bar" style="height:${Math.max(4, week.prompts / max * 100).toFixed(1)}%"></div>
+      <div class="week-label">${esc((week.week || '').replace(/^\d{4}-/, ''))}</div>
+    </div>
+  `).join('');
+}
+
+function exportSVG() {
+  if (!wrapped) return;
+  const totals = wrapped.totals || {};
+  const highlights = (wrapped.highlights || []).slice(0, 4);
+  const rows = highlights.map((h, i) => `
+    <text x="58" y="${278 + i * 70}" font-size="18" font-family="monospace" font-weight="700">${escapeXML(h.title.toUpperCase())}</text>
+    <text x="58" y="${310 + i * 70}" font-size="34" font-family="Georgia" font-weight="900">${escapeXML(displayHighlight(h, i)).slice(0, 32)}</text>
+  `).join('');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+    <rect width="1200" height="675" fill="#f6f1e4"/>
+    <path d="M0 0h1200v675H0z" fill="none" stroke="#16130f" stroke-width="18"/>
+    <rect x="42" y="42" width="1116" height="591" fill="#fffaf0" stroke="#16130f" stroke-width="5"/>
+    <rect x="58" y="58" width="256" height="42" fill="#b7ff4a" stroke="#16130f" stroke-width="4"/>
+    <text x="76" y="86" font-size="20" font-family="monospace" font-weight="900">CC-LENS WRAPPED</text>
+    <text x="58" y="190" font-size="92" font-family="Georgia" font-weight="900">Agent Wrapped</text>
+    <text x="780" y="128" font-size="88" font-family="Georgia" font-weight="900">${escapeXML(fmt(totals.prompts || 0))}</text>
+    <text x="786" y="164" font-size="20" font-family="monospace" font-weight="900">PROMPTS</text>
+    <text x="780" y="246" font-size="54" font-family="Georgia" font-weight="900">${escapeXML(fmt(totals.sources || 0))} sources</text>
+    ${rows}
+    <text x="58" y="604" font-size="18" font-family="monospace" fill="#6e675e">Raw prompts stay local. Generated by cc-lens.</text>
+  </svg>`;
+
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cc-lens-wrapped.svg';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeXML(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+document.getElementById('privacy-btn').addEventListener('click', () => {
+  privacy = !privacy;
+  document.getElementById('privacy-btn').textContent = privacy ? 'Privacy on' : 'Privacy off';
+  if (wrapped) render(wrapped);
+});
+
+document.getElementById('sample-btn').addEventListener('click', () => render(sampleWrapped));
+document.getElementById('export-btn').addEventListener('click', exportSVG);
+
+fetch('/api/wrapped')
+  .then(response => {
+    if (!response.ok) throw new Error('Failed to load wrapped data');
+    return response.json();
+  })
+  .then(render)
+  .catch(() => render(sampleWrapped));
 </script>
-
 </body>
 </html>
