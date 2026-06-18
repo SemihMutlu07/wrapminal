@@ -204,7 +204,7 @@
 
   .source-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
   }
 
@@ -433,7 +433,7 @@
       <span>cc-lens</span>
     </div>
     <div class="actions">
-      <button id="privacy-btn" type="button">Privacy on</button>
+      <button id="privacy-btn" type="button">Reveal</button>
       <button id="sample-btn" type="button">Sample</button>
       <button id="export-btn" type="button">Export SVG</button>
     </div>
@@ -441,19 +441,11 @@
 
   <section class="hero">
     <div class="headline">
-      <div class="eyebrow">Local-first AI Coding Wrapped</div>
+      <div class="eyebrow">Local only · nothing is uploaded</div>
       <h1>Agent<br>Wrapped</h1>
-      <p class="hero-copy" id="hero-copy">Reading local agent history. Raw prompts stay local and are never rendered.</p>
+      <p class="hero-copy" id="hero-copy">Reading local agent history. Raw prompts stay on your machine and are never rendered — only aggregate counts.</p>
     </div>
     <div class="scoreboard" id="scoreboard"></div>
-  </section>
-
-  <section class="band">
-    <div class="section-head">
-      <h2>Source health</h2>
-      <span class="stamp" id="generated-at"></span>
-    </div>
-    <div class="source-grid" id="sources"></div>
   </section>
 
   <section class="band">
@@ -462,6 +454,14 @@
       <span class="stamp">estimated from local history files</span>
     </div>
     <div class="wrapped-grid" id="highlights"></div>
+  </section>
+
+  <section class="band">
+    <div class="section-head">
+      <h2>Source health</h2>
+      <span class="stamp" id="generated-at"></span>
+    </div>
+    <div class="source-grid" id="sources"></div>
   </section>
 
   <section class="band split">
@@ -500,8 +500,14 @@ const sampleWrapped = {
     { id: 'claude', name: 'Claude Code', state: 'loaded', records: 184, confidence: 'estimated', message: 'Claude prompts loaded.' },
     { id: 'codex', name: 'Codex CLI', state: 'loaded', records: 76, confidence: 'estimated', message: 'Codex prompts loaded.' },
     { id: 'gemini', name: 'Gemini / Antigravity', state: 'loaded', records: 31, confidence: 'estimated', message: 'Gemini prompts loaded.' },
-    { id: 'opencode', name: 'OpenCode', state: 'detected', records: 0, confidence: 'detected', message: 'OpenCode SQLite history detected.' },
-    { id: 'cursor', name: 'Cursor', state: 'detected', records: 0, confidence: 'detected', message: 'Cursor storage detected.' }
+    { id: 'continue', name: 'Continue.dev', state: 'loaded', records: 18, confidence: 'estimated', message: 'Continue.dev prompts loaded.' },
+    { id: 'aider', name: 'Aider', state: 'loaded', records: 9, confidence: 'estimated', message: 'Aider prompts loaded.' },
+    { id: 'cursor', name: 'Cursor', state: 'detected', records: 42, confidence: 'experimental', message: 'Cursor prompt history detected (best-effort), no per-prompt timestamps.' },
+    { id: 'opencode', name: 'OpenCode', state: 'detected', records: 0, confidence: 'experimental', message: 'OpenCode database detected.' },
+    { id: 'windsurf', name: 'Windsurf / Codeium', state: 'detected', records: 0, confidence: 'detected', message: 'Windsurf/Codeium storage detected.' },
+    { id: 'cline', name: 'Cline / Roo', state: 'missing', records: 0, confidence: 'detected', message: 'No Cline/Roo storage found.' },
+    { id: 'pi', name: 'pi', state: 'missing', records: 0, confidence: 'detected', message: 'No pi storage found.' },
+    { id: 'hermes', name: 'hermes', state: 'missing', records: 0, confidence: 'detected', message: 'No hermes storage found.' }
   ],
   totals: { prompts: 291, sessions: 42, projects: 9, sources: 3, active_days: 24, estimated_tokens: 118400 },
   highlights: [
@@ -548,8 +554,16 @@ function fmt(n) {
   return String(n ?? 0);
 }
 
+// Redaction-style mask: hide the real text behind a block bar so a screenshot
+// can be shared safely. One toggle flips every masked field between ████ and the
+// real value.
+function maskText(value) {
+  const len = String(value ?? '').length;
+  return '█'.repeat(Math.min(Math.max(len, 6), 16));
+}
+
 function displayProject(name, index) {
-  return privacy ? `Project ${String.fromCharCode(65 + (index % 26))}` : name;
+  return privacy ? maskText(name) : name;
 }
 
 function displayHighlight(h, index) {
@@ -708,7 +722,8 @@ function escapeXML(value) {
 
 document.getElementById('privacy-btn').addEventListener('click', () => {
   privacy = !privacy;
-  document.getElementById('privacy-btn').textContent = privacy ? 'Privacy on' : 'Privacy off';
+  // Button shows the action: when masked, you can Reveal; when shown, you can Mask.
+  document.getElementById('privacy-btn').textContent = privacy ? 'Reveal' : 'Mask';
   if (wrapped) render(wrapped);
 });
 

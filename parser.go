@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -155,6 +156,32 @@ type projectCollector struct {
 	days     map[string]struct{}
 }
 
+// sourceParser pairs a tool with the function that reads its local history.
+type sourceParser struct {
+	id    string
+	name  string
+	parse func(home string) ([]Interaction, SourceStatus)
+}
+
+// sourceRegistry is the single list of tools cc-lens scans. JSONL-backed tools
+// are parsed into dated prompts; SQLite tools are read best-effort; the rest are
+// probed (found/not found) so the dashboard can honestly say what it sees.
+func sourceRegistry() []sourceParser {
+	return []sourceParser{
+		{"claude", "Claude Code", parseClaude},
+		{"codex", "Codex CLI", parseCodex},
+		{"gemini", "Gemini / Antigravity", parseGemini},
+		{"continue", "Continue.dev", parseContinue},
+		{"aider", "Aider", parseAider},
+		{"cursor", "Cursor", parseCursor},
+		{"opencode", "OpenCode", parseOpenCode},
+		{"windsurf", "Windsurf / Codeium", probeWindsurf},
+		{"cline", "Cline / Roo", probeCline},
+		{"pi", "pi", probePi},
+		{"hermes", "hermes", probeHermes},
+	}
+}
+
 func BuildWrapped() (*WrappedResponse, error) {
 	home, err := ccLensHome()
 	if err != nil {
@@ -164,14 +191,12 @@ func BuildWrapped() (*WrappedResponse, error) {
 	var interactions []Interaction
 	var sources []SourceStatus
 
-	for _, parser := range []func(string) ([]Interaction, SourceStatus){
-		parseClaude,
-		parseCodex,
-		parseGemini,
-		detectOpenCode,
-		detectCursor,
-	} {
-		items, status := parser(home)
+	// Table-driven source registry. To support a new tool, add one row here.
+	// Each parser reports a SourceStatus (loaded|detected|missing|error) and,
+	// when it can read dated prompts, the Interactions that feed every stat.
+	// Sources we can find but not parse stay "detected" — we never invent data.
+	for _, src := range sourceRegistry() {
+		items, status := src.parse(home)
 		sources = append(sources, status)
 		interactions = append(interactions, items...)
 	}
@@ -377,56 +402,218 @@ func parseGemini(home string) ([]Interaction, SourceStatus) {
 	return items, status
 }
 
-func detectOpenCode(home string) ([]Interaction, SourceStatus) {
-	paths := []string{
-		filepath.Join(home, ".local", "share", "opencode", "opencode.db"),
-		filepath.Join(home, "Library", "Application Support", "opencode", "opencode.db"),
-		filepath.Join(home, "AppData", "Roaming", "opencode", "opencode.db"),
-	}
+// parseContinue reads Continue.dev session files (~/.continue/sessions/*.json).
+// Each session is a JSON object with a history of messages; we count the user
+// turns and date them by the session file's first usable timestamp.
+func parseContinue(home string) ([]Interaction, SourceStatus) {
+	dir := filepath.Join(home, ".continue", "sessions")
 	status := SourceStatus{
-		ID:         "opencode",
-		Name:       "OpenCode",
+		ID:         "continue",
+		Name:       "Continue.dev",
+		Path:       dir,
+		State:      "missing",
+		Confidence: "estimated",
+		Message:    "No Continue.dev sessions found.",
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, status
+		}
+		status.State = "error"
+		status.Message = err.Error()
+		return nil, status
+	}
+
+	var items []Interaction
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		var session struct {
+			Title   string `json:"title"`
+			History []struct {
+				Message struct {
+					Role    string `json:"role"`
+					Content string `json:"content"`
+				} `json:"message"`
+				Timestamp string `json:"timestamp"`
+			} `json:"history"`
+		}
+		if err := json.Unmarshal(data, &session); err != nil {
+			continue
+		}
+
+		sessionID := strings.TrimSuffix(e.Name(), ".json")
+		for _, turn := range session.History {
+			if turn.Message.Role != "user" {
+				continue
+			}
+			ts := parseFlexibleTime(turn.Timestamp)
+			if ts.IsZero() {
+				if info, err := e.Info(); err == nil {
+					ts = info.ModTime()
+				}
+			}
+			items = append(items, Interaction{
+				Source:    status.Name,
+				SourceID:  status.ID,
+				Project:   projectName(session.Title, "Continue Session"),
+				SessionID: sessionID,
+				Timestamp: ts,
+				Chars:     len(turn.Message.Content),
+			})
+		}
+	}
+
+	status.Records = len(items)
+	status.State = loadedState(items)
+	status.Message = loadedMessage(items, "Continue.dev prompts loaded.")
+	return items, status
+}
+
+// parseAider reads Aider's plain-text input history (~/.aider.input.history).
+// Entries look like "+<prompt>" lines preceded by a "# <timestamp>" comment.
+func parseAider(home string) ([]Interaction, SourceStatus) {
+	path := filepath.Join(home, ".aider.input.history")
+	status := SourceStatus{
+		ID:         "aider",
+		Name:       "Aider",
+		Path:       path,
+		State:      "missing",
+		Confidence: "estimated",
+		Message:    "No Aider input history found.",
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, status
+		}
+		status.State = "error"
+		status.Message = err.Error()
+		return nil, status
+	}
+	defer file.Close()
+
+	var items []Interaction
+	var last time.Time
+	scanner := newJSONLScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "# ") {
+			if ts, err := time.Parse("2006-01-02 15:04:05.000000", strings.TrimSpace(line[2:])); err == nil {
+				last = ts
+			} else if ts, err := time.Parse("2006-01-02 15:04:05", strings.TrimSpace(line[2:])); err == nil {
+				last = ts
+			}
+			continue
+		}
+		if !strings.HasPrefix(line, "+") {
+			continue
+		}
+		text := line[1:]
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		ts := last
+		if ts.IsZero() {
+			if info, err := file.Stat(); err == nil {
+				ts = info.ModTime()
+			}
+		}
+		items = append(items, Interaction{
+			Source:    status.Name,
+			SourceID:  status.ID,
+			Project:   "Aider",
+			SessionID: fallbackSession("", status.ID, len(items)),
+			Timestamp: ts,
+			Chars:     len(text),
+		})
+	}
+	if err := scanner.Err(); err != nil {
+		status.State = "error"
+		status.Message = err.Error()
+		return items, status
+	}
+
+	status.Records = len(items)
+	status.State = loadedState(items)
+	status.Message = loadedMessage(items, "Aider prompts loaded.")
+	return items, status
+}
+
+// probeDir reports whether a tool's local storage exists without parsing it.
+// Used for tools whose on-disk format we have not confirmed yet, so the
+// dashboard can say "found, parser pending" instead of pretending it's absent.
+func probeDir(id, name string, paths []string, foundMsg, missingMsg string) ([]Interaction, SourceStatus) {
+	status := SourceStatus{
+		ID:         id,
+		Name:       name,
 		Path:       strings.Join(paths, ", "),
 		State:      "missing",
 		Confidence: "detected",
-		Message:    "No OpenCode database found.",
+		Message:    missingMsg,
 	}
-
 	for _, path := range paths {
 		if fileExists(path) {
 			status.Path = path
 			status.State = "detected"
-			status.Message = "OpenCode SQLite history detected. Parser is marked experimental until the storage format is stabilized or exported."
+			status.Message = foundMsg
 			return nil, status
 		}
 	}
 	return nil, status
 }
 
-func detectCursor(home string) ([]Interaction, SourceStatus) {
-	paths := []string{
-		filepath.Join(home, ".config", "Cursor"),
-		filepath.Join(home, "Library", "Application Support", "Cursor"),
-		filepath.Join(home, "AppData", "Roaming", "Cursor"),
-	}
-	status := SourceStatus{
-		ID:         "cursor",
-		Name:       "Cursor",
-		Path:       strings.Join(paths, ", "),
-		State:      "missing",
-		Confidence: "detected",
-		Message:    "No Cursor local storage found.",
-	}
+func probeWindsurf(home string) ([]Interaction, SourceStatus) {
+	return probeDir("windsurf", "Windsurf / Codeium",
+		[]string{
+			filepath.Join(home, ".config", "Windsurf"),
+			filepath.Join(home, "Library", "Application Support", "Windsurf"),
+			filepath.Join(home, "AppData", "Roaming", "Windsurf"),
+			filepath.Join(home, ".codeium"),
+		},
+		"Windsurf/Codeium storage detected. Local chat history is not a stable public format yet.",
+		"No Windsurf/Codeium storage found.")
+}
 
-	for _, path := range paths {
-		if fileExists(path) {
-			status.Path = path
-			status.State = "detected"
-			status.Message = "Cursor storage detected. Local chat history is not treated as a stable public format yet."
-			return nil, status
-		}
-	}
-	return nil, status
+func probeCline(home string) ([]Interaction, SourceStatus) {
+	return probeDir("cline", "Cline / Roo",
+		[]string{
+			filepath.Join(home, ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev"),
+			filepath.Join(home, "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev"),
+			filepath.Join(home, "AppData", "Roaming", "Code", "User", "globalStorage", "saoudrizwan.claude-dev"),
+		},
+		"Cline/Roo VSCode storage detected. Task history format is not parsed yet.",
+		"No Cline/Roo storage found.")
+}
+
+func probePi(home string) ([]Interaction, SourceStatus) {
+	return probeDir("pi", "pi",
+		[]string{
+			filepath.Join(home, ".pi"),
+			filepath.Join(home, ".config", "pi"),
+		},
+		"pi storage detected. Local history format is not confirmed yet.",
+		"No pi storage found.")
+}
+
+func probeHermes(home string) ([]Interaction, SourceStatus) {
+	return probeDir("hermes", "hermes",
+		[]string{
+			filepath.Join(home, ".hermes"),
+			filepath.Join(home, ".config", "hermes"),
+		},
+		"hermes storage detected. Local history format is not confirmed yet.",
+		"No hermes storage found.")
 }
 
 func aggregate(items []Interaction) (Totals, []ProjectStats, Timeline, []SourceBreakdown) {
@@ -720,6 +907,22 @@ func unixFlexible(ts int64) time.Time {
 	default:
 		return time.Time{}
 	}
+}
+
+// parseFlexibleTime accepts ISO-8601 strings or numeric unix timestamps
+// (seconds or milliseconds), as different tools store either form.
+func parseFlexibleTime(s string) time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t
+	}
+	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return unixFlexible(n)
+	}
+	return time.Time{}
 }
 
 func estimateTokens(chars int) int {

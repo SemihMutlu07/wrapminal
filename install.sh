@@ -46,7 +46,7 @@ else
 fi
 
 chmod +x "$target"
-echo "Installed cc-lens to $target"
+echo "Installed cc-lens to $target (prebuilt binary — no Go or Node required)"
 
 ensure_on_path() {
   case ":$PATH:" in

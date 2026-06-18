@@ -26,6 +26,15 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	// Local-first: bind to loopback only so nothing on the network can reach
+	// the dashboard. Override with CC_LENS_HOST=0.0.0.0 only if you really mean
+	// to expose it (e.g. inside a container with port mapping).
+	host := os.Getenv("CC_LENS_HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	addr := host + ":" + port
 	url := "http://localhost:" + port
 
 	http.HandleFunc("/api/wrapped", handleWrapped)
@@ -33,9 +42,9 @@ func main() {
 	http.HandleFunc("/api/timeline", handleTimeline)
 	http.Handle("/", http.FileServer(http.FS(staticFS)))
 
-	fmt.Println("cc-lens Agent Wrapped -> " + url)
+	fmt.Println("cc-lens Agent Wrapped -> " + url + "  (local only, nothing is uploaded)")
 	go openBrowser(url)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
 func handleWrapped(w http.ResponseWriter, r *http.Request) {
