@@ -49,6 +49,17 @@ func TestStatsMath_LongestStreak(t *testing.T) {
 	if got := longestStreak(duplicatesSameDay); got != 1 {
 		t.Fatalf("duplicates same day: expected 1, got %d", got)
 	}
+
+	if loc, err := time.LoadLocation("America/New_York"); err == nil {
+		dst := []Interaction{
+			{Timestamp: time.Date(2026, 3, 7, 12, 0, 0, 0, loc)},
+			{Timestamp: time.Date(2026, 3, 8, 12, 0, 0, 0, loc)},
+			{Timestamp: time.Date(2026, 3, 9, 12, 0, 0, 0, loc)},
+		}
+		if got := longestStreak(dst); got != 3 {
+			t.Fatalf("DST streak: expected 3, got %d (old 24h-gap logic returned 2)", got)
+		}
+	}
 }
 
 func TestStatsMath_PeakHour(t *testing.T) {

@@ -1152,7 +1152,8 @@ func longestStreak(items []Interaction) int {
 	best := 1
 	current := 1
 	for i := 1; i < len(list); i++ {
-		if list[i].Sub(list[i-1]).Hours() == 24 {
+		// One calendar day later, regardless of DST (23h/25h transitions).
+		if list[i].Equal(list[i-1].AddDate(0, 0, 1)) {
 			current++
 			if current > best {
 				best = current
