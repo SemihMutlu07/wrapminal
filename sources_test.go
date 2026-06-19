@@ -28,6 +28,30 @@ func TestParseContinueReadsSessions(t *testing.T) {
 	}
 }
 
+func TestParsePiReadsSessions(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, ".pi", "agent", "sessions", "--proj--")
+	writeFile(t, filepath.Join(dir, "2026-06-15T03-41-52-901Z_abc.jsonl"),
+		`{"type":"session","id":"abc","timestamp":"2026-06-15T03:41:52.901Z","cwd":"/tmp/project-delta"}`+"\n"+
+			`{"type":"message","timestamp":"2026-06-15T03:42:00Z","message":{"role":"user","content":[{"type":"text","text":"hello pi"}]}}`+"\n"+
+			`{"type":"message","timestamp":"2026-06-15T03:42:05Z","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]}}`+"\n"+
+			`{"type":"message","timestamp":"2026-06-15T03:43:00Z","message":{"role":"user","content":[{"type":"text","text":"second prompt"}]}}`+"\n")
+
+	items, status := parsePi(home)
+	if status.State != "loaded" {
+		t.Fatalf("expected pi loaded, got %q (%s)", status.State, status.Message)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 user prompts, got %d", len(items))
+	}
+	if items[0].Project != "project-delta" {
+		t.Fatalf("expected project from cwd, got %q", items[0].Project)
+	}
+	if items[0].Chars != len("hello pi") {
+		t.Fatalf("expected char count from text part, got %d", items[0].Chars)
+	}
+}
+
 func TestParseAiderReadsInputHistory(t *testing.T) {
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".aider.input.history"),

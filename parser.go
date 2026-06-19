@@ -177,7 +177,7 @@ func sourceRegistry() []sourceParser {
 		{"opencode", "OpenCode", parseOpenCode},
 		{"windsurf", "Windsurf / Codeium", probeWindsurf},
 		{"cline", "Cline / Roo", probeCline},
-		{"pi", "pi", probePi},
+		{"pi", "pi", parsePi},
 		{"hermes", "hermes", probeHermes},
 	}
 }
@@ -596,14 +596,118 @@ func probeCline(home string) ([]Interaction, SourceStatus) {
 		"No Cline/Roo storage found.")
 }
 
-func probePi(home string) ([]Interaction, SourceStatus) {
-	return probeDir("pi", "pi",
-		[]string{
-			filepath.Join(home, ".pi"),
-			filepath.Join(home, ".config", "pi"),
-		},
-		"pi storage detected. Local history format is not confirmed yet.",
-		"No pi storage found.")
+// piTextLen sums the length of text parts in a pi message content array.
+// content may be an array of {"type":"text","text":"..."} parts; non-text
+// parts (tool calls, images) are ignored for the char estimate.
+func piTextLen(raw json.RawMessage) int {
+	var parts []struct {
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(raw, &parts) == nil {
+		n := 0
+		for _, p := range parts {
+			n += len(p.Text)
+		}
+		return n
+	}
+	var s string // tolerate a plain-string content form
+	if json.Unmarshal(raw, &s) == nil {
+		return len(s)
+	}
+	return 0
+}
+
+// parsePi reads pi's session history (~/.pi/agent/sessions/<project>/*.jsonl).
+// Each file is one real session; the first line (type=="session") carries the
+// project cwd, and each subsequent type=="message" line with role=="user" is
+// one prompt.
+func parsePi(home string) ([]Interaction, SourceStatus) {
+	root := filepath.Join(home, ".pi", "agent", "sessions")
+	status := SourceStatus{
+		ID:         "pi",
+		Name:       "pi",
+		Path:       root,
+		State:      "missing",
+		Confidence: "estimated",
+		Message:    "No pi session history found.",
+	}
+
+	projectDirs, err := os.ReadDir(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, status
+		}
+		status.State = "error"
+		status.Message = err.Error()
+		return nil, status
+	}
+
+	var items []Interaction
+	for _, pd := range projectDirs {
+		if !pd.IsDir() {
+			continue
+		}
+		files, _ := os.ReadDir(filepath.Join(root, pd.Name()))
+		for _, f := range files {
+			if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
+				continue
+			}
+			path := filepath.Join(root, pd.Name(), f.Name())
+			file, err := os.Open(path)
+			if err != nil {
+				continue
+			}
+			project := "pi Session"
+			sessID := strings.TrimSuffix(f.Name(), ".jsonl")
+			scanner := newJSONLScanner(file)
+			for scanner.Scan() {
+				var line struct {
+					Type      string `json:"type"`
+					Timestamp string `json:"timestamp"`
+					Cwd       string `json:"cwd"`
+					ID        string `json:"id"`
+					Message   struct {
+						Role    string          `json:"role"`
+						Content json.RawMessage `json:"content"`
+					} `json:"message"`
+				}
+				if json.Unmarshal(scanner.Bytes(), &line) != nil {
+					continue
+				}
+				switch line.Type {
+				case "session":
+					if line.Cwd != "" {
+						project = projectName(line.Cwd, project)
+					}
+					if line.ID != "" {
+						sessID = line.ID
+					}
+				case "message":
+					if line.Message.Role != "user" {
+						continue
+					}
+					ts := parseFlexibleTime(line.Timestamp)
+					if ts.IsZero() {
+						continue
+					}
+					items = append(items, Interaction{
+						Source:    status.Name,
+						SourceID:  status.ID,
+						Project:   project,
+						SessionID: sessID,
+						Timestamp: ts,
+						Chars:     piTextLen(line.Message.Content),
+					})
+				}
+			}
+			file.Close()
+		}
+	}
+
+	status.Records = len(items)
+	status.State = loadedState(items)
+	status.Message = loadedMessage(items, "pi prompts loaded.")
+	return items, status
 }
 
 func probeHermes(home string) ([]Interaction, SourceStatus) {
