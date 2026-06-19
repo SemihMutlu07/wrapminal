@@ -554,12 +554,27 @@ function fmt(n) {
   return String(n ?? 0);
 }
 
-// Redaction-style mask: hide the real text behind a block bar so a screenshot
-// can be shared safely. One toggle flips every masked field between ████ and the
-// real value.
+// Privacy mask: replace the real project name with a fixed, length-independent
+// funny codename, so a shared screenshot leaks neither the name nor its length.
+// The same name always maps to the same codename, so the reveal toggle is stable.
+const FUN_NAMES = [
+  'fuzzling', 'blabbering', 'schlepping', 'cogitating', 'noodling',
+  'percolating', 'marinating', 'ruminating', 'conjuring', 'finagling',
+  'bamboozling', 'discombobulating', 'wrangling', 'bedazzling', 'flummoxing',
+  'kerfuffling', 'razzmatazzing', 'shenaniganing', 'doohickeying', 'thingamajigging',
+  'gobbledygooking', 'malarkeying', 'bumfuzzling', 'lollygagging', 'snollygostering',
+  'wibbling', 'canoodling', 'gallivanting', 'skedaddling', 'whatchamacalling'
+];
+
+// djb2-ish string hash → stable index into FUN_NAMES.
+function hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 function maskText(value) {
-  const len = String(value ?? '').length;
-  return '█'.repeat(Math.min(Math.max(len, 6), 16));
+  return FUN_NAMES[hashStr(String(value ?? '')) % FUN_NAMES.length];
 }
 
 function displayProject(name, index) {
@@ -604,12 +619,20 @@ function renderScoreboard(totals) {
 }
 
 function renderSources(sources) {
-  document.getElementById('sources').innerHTML = sources.map(source => `
+  // Hide tools that simply aren't installed — a "missing" card for a tool the
+  // user never had is noise. Detected-but-unparsed tools (folder found, no
+  // parser yet) stay, but say "parser pending" instead of a misleading "0 records".
+  const visible = sources.filter(s => s.state !== 'missing');
+  document.getElementById('sources').innerHTML = visible.map(source => {
+    const recs = source.records > 0 ? `${fmt(source.records)} records`
+      : source.state === 'error' ? 'read error'
+      : 'parser pending';
+    return `
     <article class="source ${esc(source.state)}">
       <div class="source-name">${esc(source.name)}</div>
-      <div class="source-state">${esc(source.state)} / ${fmt(source.records || 0)} records<br>${esc(source.message || '')}</div>
-    </article>
-  `).join('');
+      <div class="source-state">${esc(source.state)} / ${recs}<br>${esc(source.message || '')}</div>
+    </article>`;
+  }).join('');
 }
 
 function renderHighlights(highlights) {

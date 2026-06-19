@@ -50,7 +50,7 @@ http://localhost:8080
 
 ## Sources
 
-cc-lens scans for many tools and honestly reports what it can see: **loaded** (prompts parsed into the summary), **detected** (found on disk, format not fully parsed yet), or **missing**.
+cc-lens scans for many tools and honestly reports what it can see: **loaded** (prompts parsed into the summary) or **detected** (found on disk, parser pending). Tools that aren't installed are simply hidden — no noise for things you never had.
 
 | Tool | Status | Notes |
 | --- | --- | --- |
@@ -60,10 +60,11 @@ cc-lens scans for many tools and honestly reports what it can see: **loaded** (p
 | Continue.dev | Loaded | Reads `~/.continue/sessions/*.json` |
 | Aider | Loaded | Reads `~/.aider.input.history` |
 | Cursor | Detected | Reads `state.vscdb` best-effort; prompts carry no per-prompt timestamps, so they show as a count |
-| OpenCode | Detected | Reads `opencode.db` best-effort; falls back to detected if the schema is unrecognized |
+| OpenCode | Loaded | Reads `opencode.db`; decodes each `message` row's JSON `data` to count user prompts (role-aware), dated by `time_created`. Falls back to detected on an unrecognized schema |
 | Windsurf / Codeium | Detected | Storage located; chat format not parsed yet |
 | Cline / Roo | Detected | VSCode storage located; task history not parsed yet |
-| pi · hermes | Detected | Probed at common paths; local format not confirmed yet |
+| pi | Loaded | Reads `~/.pi/agent/sessions/<project>/*.jsonl`; per-project, one real session per file |
+| hermes | Detected | Probed at common paths; local format not confirmed yet |
 
 Adding a tool is one row in `sourceRegistry()` (`parser.go`). Sources we can find but not parse stay **detected** — cc-lens never invents data.
 
@@ -74,7 +75,7 @@ cc-lens is built to be a closed, local system:
 - **Nothing is uploaded.** The app makes no outbound network calls — it only reads local files and serves a page to your browser.
 - **Local-only by default.** The server binds to `127.0.0.1`, so nothing on your network can reach it. (Override with `CC_LENS_HOST=0.0.0.0` only if you deliberately want to expose it, e.g. inside a container.)
 - **Aggregates only.** Raw prompts are never rendered — only counts, dates, project names, and **estimated** tokens (a `chars / 4` approximation, labeled as such in the UI).
-- **Masked by default.** Project names render as `████` redaction bars. One button toggles every masked field between `████` and the real text, so a screenshot is safe to share.
+- **Masked by default.** Project names render as fixed, length-independent codenames (e.g. `fuzzling`, `noodling`) — a shared screenshot leaks neither the real name nor its length. One button (Reveal) toggles between the codename and the real name.
 
 ## From source
 
