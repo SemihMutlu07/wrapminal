@@ -38,8 +38,6 @@ func main() {
 	url := "http://localhost:" + port
 
 	http.HandleFunc("/api/wrapped", handleWrapped)
-	http.HandleFunc("/api/stats", handleStats)
-	http.HandleFunc("/api/timeline", handleTimeline)
 	http.Handle("/", http.FileServer(http.FS(staticFS)))
 
 	fmt.Println("cc-lens Agent Wrapped -> " + url + "  (local only, nothing is uploaded)")
@@ -50,16 +48,6 @@ func main() {
 func handleWrapped(w http.ResponseWriter, r *http.Request) {
 	wrapped, err := BuildWrapped()
 	writeJSON(w, wrapped, err)
-}
-
-func handleTimeline(w http.ResponseWriter, r *http.Request) {
-	tl, err := ParseTimeline()
-	writeJSON(w, tl, err)
-}
-
-func handleStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := ParseHistory()
-	writeJSON(w, stats, err)
 }
 
 func writeJSON(w http.ResponseWriter, value any, err error) {

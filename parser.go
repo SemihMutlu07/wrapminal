@@ -218,22 +218,6 @@ func BuildWrapped() (*WrappedResponse, error) {
 	}, nil
 }
 
-func ParseHistory() ([]ProjectStats, error) {
-	wrapped, err := BuildWrapped()
-	if err != nil {
-		return nil, err
-	}
-	return wrapped.Projects, nil
-}
-
-func ParseTimeline() (*Timeline, error) {
-	wrapped, err := BuildWrapped()
-	if err != nil {
-		return nil, err
-	}
-	return &wrapped.Timeline, nil
-}
-
 func ccLensHome() (string, error) {
 	if override := os.Getenv("CC_LENS_HOME"); override != "" {
 		return override, nil

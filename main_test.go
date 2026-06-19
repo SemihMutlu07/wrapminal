@@ -18,8 +18,6 @@ func TestAPIHandlersReturnJSON(t *testing.T) {
 		fn   http.HandlerFunc
 	}{
 		{name: "wrapped", path: "/api/wrapped", fn: handleWrapped},
-		{name: "stats", path: "/api/stats", fn: handleStats},
-		{name: "timeline", path: "/api/timeline", fn: handleTimeline},
 	}
 
 	for _, tt := range tests {
