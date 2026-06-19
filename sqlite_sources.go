@@ -171,6 +171,18 @@ func parseOpenCode(home string) ([]Interaction, SourceStatus) {
 	}
 
 	cols := sqliteColumns(db, table)
+	hasData := pickColumn(cols, "data") != ""
+	hasTimeCreated := pickColumn(cols, "time_created") != ""
+	if hasData && hasTimeCreated {
+		items := openCodeUserPrompts(db, table, status)
+		if len(items) > 0 {
+			status.Records = len(items)
+			status.State = "loaded"
+			status.Message = "OpenCode user prompts loaded (role-aware)."
+			return items, status
+		}
+	}
+
 	timeCol := pickColumn(cols, "created_at", "createdat", "time", "timestamp", "ts", "created")
 	contentCol := pickColumn(cols, "content", "text", "body", "message", "parts")
 	roleCol := pickColumn(cols, "role", "type", "author")
@@ -194,9 +206,9 @@ func parseOpenCode(home string) ([]Interaction, SourceStatus) {
 }
 
 func openCodeMessages(db *sql.DB, table, timeCol, contentCol, roleCol string, status SourceStatus) []Interaction {
-	selectCols := timeCol + ", " + contentCol
+	selectCols := quoteIdent(timeCol) + ", " + quoteIdent(contentCol)
 	if roleCol != "" {
-		selectCols += ", " + roleCol
+		selectCols += ", " + quoteIdent(roleCol)
 	}
 	rows, err := db.Query("SELECT " + selectCols + " FROM " + quoteIdent(table))
 	if err != nil {
@@ -233,6 +245,70 @@ func openCodeMessages(db *sql.DB, table, timeCol, contentCol, roleCol string, st
 		})
 	}
 	return items
+}
+
+// openCodeUserPrompts reads OpenCode's role-in-JSON schema: message has time_created
+// (epoch int) and a JSON data column whose role field distinguishes user/assistant.
+// Returns one Interaction per user message, dated by time_created. Char counts are
+// best-effort from the part table.
+func openCodeUserPrompts(db *sql.DB, table string, status SourceStatus) []Interaction {
+	charsByMsg := openCodePartChars(db)
+	rows, err := db.Query("SELECT " + quoteIdent("id") + ", " + quoteIdent("time_created") + ", " + quoteIdent("data") + " FROM " + quoteIdent(table))
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var items []Interaction
+	for rows.Next() {
+		var id sql.NullString
+		var tcreated sql.NullInt64
+		var data sql.NullString
+		if rows.Scan(&id, &tcreated, &data) != nil {
+			continue
+		}
+		var meta struct {
+			Role string `json:"role"`
+		}
+		if json.Unmarshal([]byte(data.String), &meta) != nil || !strings.EqualFold(meta.Role, "user") {
+			continue
+		}
+		ts := unixFlexible(tcreated.Int64)
+		if ts.IsZero() {
+			continue
+		}
+		items = append(items, Interaction{
+			Source:    status.Name,
+			SourceID:  status.ID,
+			Project:   "OpenCode",
+			SessionID: "",
+			Timestamp: ts,
+			Chars:     charsByMsg[id.String],
+		})
+	}
+	return items
+}
+
+// openCodePartChars sums text-part lengths per message_id, best-effort.
+func openCodePartChars(db *sql.DB) map[string]int {
+	out := map[string]int{}
+	rows, err := db.Query("SELECT " + quoteIdent("message_id") + ", " + quoteIdent("data") + " FROM " + quoteIdent("part"))
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var mid, data sql.NullString
+		if rows.Scan(&mid, &data) != nil {
+			continue
+		}
+		var p struct {
+			Text string `json:"text"`
+		}
+		if json.Unmarshal([]byte(data.String), &p) == nil {
+			out[mid.String] += len(p.Text)
+		}
+	}
+	return out
 }
 
 func sqliteColumns(db *sql.DB, table string) []string {

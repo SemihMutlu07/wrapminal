@@ -90,6 +90,30 @@ func TestParseOpenCodeFallsBackToDetectedOnUnknownSchema(t *testing.T) {
 	}
 }
 
+func TestParseOpenCodeRealSchema(t *testing.T) {
+	home := t.TempDir()
+	dbPath := filepath.Join(home, ".local", "share", "opencode", "opencode.db")
+	mkdirForTest(t, dbPath)
+	db, _ := sql.Open("sqlite", "file:"+dbPath)
+	mustExec(t, db, `CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT)`)
+	mustExec(t, db, `CREATE TABLE part (id TEXT, message_id TEXT, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT)`)
+	mustExec(t, db, `INSERT INTO message VALUES ('m1','s1',1770849392000,0,'{"role":"user"}')`)
+	mustExec(t, db, `INSERT INTO message VALUES ('m2','s1',1770849393000,0,'{"role":"assistant"}')`)
+	mustExec(t, db, `INSERT INTO part VALUES ('p1','m1','s1',0,0,'{"type":"text","text":"hello opencode"}')`)
+	db.Close()
+
+	items, status := parseOpenCode(home)
+	if status.State != "loaded" {
+		t.Fatalf("expected loaded, got %q (%s)", status.State, status.Message)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 user prompt, got %d", len(items))
+	}
+	if items[0].Chars != len("hello opencode") {
+		t.Fatalf("expected chars from part text, got %d", items[0].Chars)
+	}
+}
+
 func TestParseCursorCountsPromptsBestEffort(t *testing.T) {
 	home := t.TempDir()
 	dbPath := filepath.Join(home, ".config", "Cursor", "User", "globalStorage", "state.vscdb")
