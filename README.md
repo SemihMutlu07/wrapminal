@@ -6,6 +6,14 @@ Local-first "AI Coding Wrapped" for Claude Code, Codex, Gemini/Antigravity, Cont
 
 ![Dashboard](assets/dashboard.png)
 
+## What it does
+
+- **Multi-source parsing:** Reads session history from 11+ AI coding tools (Claude Code, Codex, Gemini, Continue, Aider, Cursor, OpenCode, pi, and more).
+- **Resolved Loops detection:** Scans your Claude Code and Codex session logs for verification commands (`go test`, `npm test`, `pytest`, etc.) that failed and then later passed in the same session — evidence-backed "loops escaped", not vibes.
+- **Shareable terminal cards:** Renders a terminal-style card with a headline count (`7 loops escaped`), a `stuck → recovery → verified` trace, and a playful label. Exportable as SVG.
+- **Privacy by default:** Project names are masked as stable codenames (`fuzzling`, `noodling`). One click to reveal.
+- **Zero cloud:** The server binds to `127.0.0.1` and makes no outbound calls.
+
 ## Quick Start
 
 You do **not** need Go or any toolchain to run cc-lens — every option below downloads a prebuilt, self-contained binary. Pick the one that matches what you already have.
@@ -48,6 +56,53 @@ Then open:
 http://localhost:8080
 ```
 
+## How to test
+
+From source (needs Go):
+
+```bash
+git clone https://github.com/SemihMutlu07/cc-lens.git
+cd cc-lens
+
+# Run the full test suite
+go test ./...
+
+# Vet for static issues
+go vet ./...
+
+# Build and run locally
+go run .
+```
+
+### What the tests cover
+
+| Test file | What it checks |
+| --- | --- |
+| `parser_test.go` | Source parsing for Claude, Codex, Gemini, Aider, Continue |
+| `stats_math_test.go` | Streak counting (calendar day, not 24h), peak hour, weekend, session clustering |
+| `resolved_loops_test.go` | Resolved loop detection: failed→passing verification pair, Codex session format |
+| `sources_test.go` | Source registry coverage |
+| `main_test.go` | HTTP handler smoke test |
+
+### Verify the API directly
+
+```bash
+go run . &
+sleep 1
+curl -s http://127.0.0.1:8080/api/wrapped | jq '.resolved_loops'
+```
+
+You should see something like:
+
+```json
+{
+  "count": 21,
+  "sessions_scanned": 468,
+  "evidence": "proven",
+  "example": { "source": "Codex CLI", "attempts": 2 }
+}
+```
+
 ## Sources
 
 cc-lens scans for many tools and honestly reports what it can see: **loaded** (prompts parsed into the summary) or **detected** (found on disk, parser pending). Tools that aren't installed are simply hidden — no noise for things you never had.
@@ -67,6 +122,22 @@ cc-lens scans for many tools and honestly reports what it can see: **loaded** (p
 | hermes | Detected | Probed at common paths; local format not confirmed yet |
 
 Adding a tool is one row in `sourceRegistry()` (`parser.go`). Sources we can find but not parse stay **detected** — cc-lens never invents data.
+
+## Resolved Loops
+
+The headline feature. cc-lens scans your Claude Code and Codex session logs for:
+
+1. A verification command (`go test`, `npm test`, `pytest`, `cargo test`, etc.)
+2. That command failing (exit code ≠ 0)
+3. A later verification command in the same session passing (exit code 0)
+
+When it finds such a pair, it counts one **resolved loop** — evidence-backed proof that you got stuck and recovered. No prose guessing, no "the user seemed frustrated" inference.
+
+The dashboard renders this as a terminal-style card with:
+- Headline count (`7 loops escaped`)
+- Playful label (`THE BUG BLINKED FIRST`, `COMEBACK MERCHANT`, `ABSOLUTELY REFUSED TO QUIT`)
+- Trace (`01 / stuck → FAILED`, `02 / work → KEPT GOING`, `03 / proof → PASSED`)
+- SVG export for sharing
 
 ## Privacy & Safety
 
@@ -96,6 +167,26 @@ go run .
 | `CC_LENS_HOME` | your home dir | Root to scan for history files |
 | `CC_LENS_NO_BROWSER` | unset | Set to `1` to skip auto-opening the browser |
 
+## Project structure
+
+```
+cc-lens/
+├── main.go                 # HTTP server, static file serving
+├── parser.go               # Source registry, parsing, /api/wrapped handler
+├── sqlite_sources.go       # SQLite-backed source parsers (Cursor, OpenCode)
+├── resolved_loops.go       # Resolved loop detector (Claude + Codex sessions)
+├── *_test.go               # Tests for each module
+├── static/index.html       # Dashboard UI (vanilla JS, no build step)
+├── npm/                    # npx wrapper package
+├── install.sh              # One-line install script
+├── .github/workflows/      # CI (go vet + go test) and release builds
+└── DECISION.md             # Product differentiation decision
+```
+
 ## Built with
 
 Go + Vanilla JS
+
+## Status
+
+**Working.** Tests pass, build is green, CI runs `go vet` + `go test` on every push. The Resolved Loops feature is implemented and verified against real local data (21 loops detected across 468 sessions on the developer's machine).
